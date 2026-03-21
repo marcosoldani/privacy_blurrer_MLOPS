@@ -209,3 +209,17 @@ __marimo__/
 
 data/
 .DS_Store
+
+# Maschere generate dall'inferenza
+*_mask.png
+
+# Modelli addestrati
+experiments/
+
+# MLflow
+mlruns/
+experiments/mlruns/
+
+# Dataset processato
+data/
+*.db

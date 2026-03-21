@@ -1,7 +1,7 @@
 import mlflow
 import torch
 from torch.utils.data import DataLoader, random_split
-from src.dataset import PersonSegmentationDataset
+from dataset import PersonSegmentationDataset
 import segmentation_models_pytorch as smp
 
 PARAMS = {
