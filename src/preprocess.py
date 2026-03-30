@@ -1,63 +1,54 @@
 """
-preprocess.py
-
-Legge le immagini grezze da data/raw/ e salva le versioni preprocessate
-in data/processed/, pronte per il training.
+Preprocessa il dataset: ridimensiona le immagini e divide in train/val/test.
 
 Uso:
-    python src/preprocess.py --input data/raw --output data/processed
+    python src/preprocess.py
 """
-
-import argparse
+import shutil
+import random
 from pathlib import Path
-import numpy as np
 from PIL import Image
-import albumentations as A
+
+RAW_DIR  = Path("data/raw")
+OUT_DIR  = Path("data/processed")
+IMG_SIZE = (256, 256)
+SPLIT    = {"train": 0.8, "val": 0.1, "test": 0.1}
+SEED     = 42
 
 
-TRANSFORM = A.Compose([
-    A.Resize(256, 256),
-    A.HorizontalFlip(p=0.5),
-    A.RandomBrightnessContrast(p=0.3),
-], additional_targets={"mask": "mask"})
+def preprocess(raw_dir=RAW_DIR, out_dir=OUT_DIR, img_size=IMG_SIZE, seed=SEED):
+    raw_dir = Path(raw_dir)
+    out_dir = Path(out_dir)
 
+    images = sorted((raw_dir / "images").glob("*.jpg"))
+    random.seed(seed)
+    random.shuffle(images)
 
-def preprocess(input_dir: str, output_dir: str):
-    input_dir  = Path(input_dir)
-    output_dir = Path(output_dir)
+    n = len(images)
+    n_train = int(n * SPLIT["train"])
+    n_val   = int(n * SPLIT["val"])
+    splits  = {
+        "train": images[:n_train],
+        "val":   images[n_train:n_train + n_val],
+        "test":  images[n_train + n_val:],
+    }
 
-    (output_dir / "images").mkdir(parents=True, exist_ok=True)
-    (output_dir / "masks").mkdir(parents=True, exist_ok=True)
+    for split, files in splits.items():
+        (out_dir / split / "images").mkdir(parents=True, exist_ok=True)
+        (out_dir / split / "masks").mkdir(parents=True, exist_ok=True)
+        for img_path in files:
+            mask_path = raw_dir / "masks" / (img_path.stem + ".png")
 
-    image_paths = sorted((input_dir / "images").glob("*.png"))
+            img  = Image.open(img_path).convert("RGB").resize(img_size)
+            mask = Image.open(mask_path).convert("L").resize(img_size, Image.NEAREST)
 
-    if not image_paths:
-        print(f"Nessuna immagine trovata in {input_dir / 'images'}")
-        return
+            img.save(out_dir  / split / "images" / img_path.name)
+            mask.save(out_dir / split / "masks"  / (img_path.stem + ".png"))
 
-    print(f"Preprocessing {len(image_paths)} immagini...")
-
-    for img_path in image_paths:
-        mask_path = input_dir / "masks" / (img_path.stem + ".png")
-
-        if not mask_path.exists():
-            print(f"  [SKIP] maschera mancante per {img_path.name}")
-            continue
-
-        image = np.array(Image.open(img_path).convert("RGB"))
-        mask  = (np.array(Image.open(mask_path).convert("L")) > 127).astype(np.uint8) * 255
-
-        out   = TRANSFORM(image=image, mask=mask)
-
-        Image.fromarray(out["image"]).save(output_dir / "images" / img_path.name)
-        Image.fromarray(out["mask"]).save(output_dir / "masks"  / (img_path.stem + ".png"))
-
-    print(f"Salvato in {output_dir}")
+    for split, files in splits.items():
+        print(f"{split:5s}: {len(files)} campioni")
+    print(f"Dimensione: {img_size} — salvati in {out_dir}/")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Preprocess Privacy Blurrer dataset")
-    parser.add_argument("--input",  type=str, default="data/raw",       help="Cartella input con images/ e masks/")
-    parser.add_argument("--output", type=str, default="data/processed", help="Cartella output")
-    args = parser.parse_args()
-    preprocess(args.input, args.output)
+    preprocess()
