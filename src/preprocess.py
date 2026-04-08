@@ -20,7 +20,7 @@ def preprocess(raw_dir=RAW_DIR, out_dir=OUT_DIR, img_size=IMG_SIZE, seed=SEED):
     raw_dir = Path(raw_dir)
     out_dir = Path(out_dir)
 
-    images = sorted((raw_dir / "images").glob("*.jpg"))
+    images = sorted((raw_dir / "images").glob("*.png"))
     random.seed(seed)
     random.shuffle(images)
 
