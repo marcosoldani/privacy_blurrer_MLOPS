@@ -27,7 +27,7 @@ def raw_data(tmp_path):
     for i in range(5):
         img  = Image.fromarray(np.random.randint(0, 255, (64, 64, 3), dtype=np.uint8))
         mask = Image.fromarray(np.random.randint(0, 2, (64, 64), dtype=np.uint8) * 255)
-        img.save(img_dir  / f"img_{i:02d}.jpg")
+        img.save(img_dir  / f"img_{i:02d}.png")
         mask.save(mask_dir / f"img_{i:02d}.png")
     return tmp_path
 
@@ -49,7 +49,7 @@ def test_preprocess_creates_splits(processed_data):
 
 def test_preprocess_total_count(raw_data, processed_data):
     total = sum(
-        len(list((processed_data / split / "images").glob("*.jpg")))
+        len(list((processed_data / split / "images").glob("*.png")))
         for split in ("train", "val", "test")
     )
     assert total == 5
@@ -102,7 +102,7 @@ def test_training_loss_decreases(processed_data):
 
 def test_predict_mask_shape(tmp_path):
     model = smp.Unet("resnet34", encoder_weights=None, classes=1)
-    img_path = tmp_path / "test.jpg"
+    img_path = tmp_path / "test.png"
     Image.fromarray(np.random.randint(0, 255, (64, 64, 3), dtype=np.uint8)).save(img_path)
 
     mask = predict_mask(model, img_path, img_size=(64, 64))
@@ -111,7 +111,7 @@ def test_predict_mask_shape(tmp_path):
 
 def test_predict_mask_binary(tmp_path):
     model = smp.Unet("resnet34", encoder_weights=None, classes=1)
-    img_path = tmp_path / "test.jpg"
+    img_path = tmp_path / "test.png"
     Image.fromarray(np.random.randint(0, 255, (64, 64, 3), dtype=np.uint8)).save(img_path)
 
     mask = predict_mask(model, img_path, img_size=(64, 64))
