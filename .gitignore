@@ -214,8 +214,6 @@ data/
 *_mask.png
 
 # Modelli addestrati
-experiments/
-
 # MLflow
 mlruns/
 experiments/mlruns/
