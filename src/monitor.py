@@ -1,87 +1,96 @@
 """
-monitor.py - Drift detection for Privacy Blurrer inference pipeline.
+monitor.py - Drift detection per Privacy Blurrer.
 
-Uses Alibi Detect KSDrift on 3 lightweight image statistics:
-mean R channel, mean G channel, mean B channel.
+Implementa un detector di drift custom senza dipendenze esterne (solo numpy).
+
+Approccio:
+- Fit: si salvano le distribuzioni delle medie R, G, B del training set
+  (N valori float, uno per immagine).
+- Check: per ogni canale si verifica se la media dell'immagine corrente
+  cade fuori dall'intervallo [p_low, p_high] della distribuzione di riferimento.
+  Se almeno un canale e' fuori soglia -> drift rilevato.
 """
 
-import pickle
+import json
 import logging
 import numpy as np
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-DETECTOR_PATH = Path(__file__).parent.parent / "detector.pkl"
+DETECTOR_PATH   = Path(__file__).parent.parent / "detector.json"
+P_VAL_THRESHOLD = 0.05   # valori fuori dal 2.5%-97.5% percentile = drift
 
 
 def extract_features(image_tensor) -> np.ndarray:
-    """
-    Extract 3 scalar features from a CHW float tensor (values in [0,1]).
-    Returns shape (1, 3): [mean_R, mean_G, mean_B].
-    """
-    arr = image_tensor.cpu().numpy()  # (C, H, W)
+    arr      = image_tensor.cpu().numpy()
     features = np.array([[arr[0].mean(), arr[1].mean(), arr[2].mean()]])
     return features.astype(np.float32)
 
 
 def fit_detector(reference_features: np.ndarray, save_path: Path = DETECTOR_PATH):
-    """
-    Fit a KSDrift detector on reference features and save to disk.
-
-    Args:
-        reference_features: shape (N, 3) array of training image features.
-        save_path: where to persist the fitted detector.
-    """
-    from alibi_detect.cd import KSDrift
-
-    detector = KSDrift(reference_features, p_val=0.05)
+    save_path = Path(save_path)
     save_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(save_path, "wb") as f:
-        pickle.dump(detector, f)
-    logger.info(f"Detector fitted on {len(reference_features)} samples and saved to {save_path}")
-    return detector
+
+    alpha = P_VAL_THRESHOLD / 2
+
+    payload = {
+        "n_samples":       int(reference_features.shape[0]),
+        "n_features":      int(reference_features.shape[1]),
+        "percentile_low":  np.percentile(reference_features, alpha * 100, axis=0).tolist(),
+        "percentile_high": np.percentile(reference_features, (1 - alpha) * 100, axis=0).tolist(),
+        "mean_ref":        reference_features.mean(axis=0).tolist(),
+        "std_ref":         reference_features.std(axis=0).tolist(),
+    }
+
+    with open(save_path, "w") as f:
+        json.dump(payload, f, indent=2)
+
+    logger.info(
+        f"Detector fittato su {payload['n_samples']} campioni, salvato in {save_path}."
+    )
+    return payload
 
 
 def load_detector(path: Path = DETECTOR_PATH):
-    """Load a previously fitted detector from disk."""
+    path = Path(path)
     if not path.exists():
         raise FileNotFoundError(
-            f"Detector not found at {path}. "
-            "Run scripts/fit_detector.py first."
+            f"Detector non trovato in {path}. "
+            "Esegui prima: python scripts/fit_detector.py"
         )
-    with open(path, "rb") as f:
-        detector = pickle.load(f)
-    logger.info(f"Detector loaded from {path}")
-    return detector
+    with open(path, "r") as f:
+        payload = json.load(f)
+    logger.info(f"Detector caricato da {path} ({payload['n_samples']} campioni di riferimento)")
+    return payload
 
 
 def check_drift(image_tensor, detector=None) -> dict:
     """
-    Run drift detection on a single image tensor.
+    Verifica se l'immagine corrente e' fuori dalla distribuzione di training.
 
-    Args:
-        image_tensor: torch.Tensor of shape (C, H, W), values in [0, 1].
-        detector: optional pre-loaded detector (loaded from disk if None).
+    Per ogni canale (R, G, B) confronta la media dell'immagine corrente
+    con il range [percentile_low, percentile_high] del training set.
+    Se almeno un canale e' fuori range -> drift.
 
     Returns:
-        dict with keys:
-            is_drift (bool): True if drift detected.
-            drift_score (float): mean p-value across KS tests (lower = more drift).
-            features (list): the 3 extracted feature values [mean_R, mean_G, mean_B].
+        dict: is_drift (bool), drift_score (float), features (list)
     """
     if detector is None:
         detector = load_detector()
 
-    features = extract_features(image_tensor)
-    result = detector.predict(features)
+    p_low   = np.array(detector["percentile_low"],  dtype=np.float32)
+    p_high  = np.array(detector["percentile_high"], dtype=np.float32)
+    mean_r  = np.array(detector["mean_ref"],        dtype=np.float32)
+    std_r   = np.array(detector["std_ref"],         dtype=np.float32)
 
-    is_drift = bool(result["data"]["is_drift"])
-    p_vals = result["data"]["p_val"]
-    drift_score = float(np.mean(p_vals))
+    features    = extract_features(image_tensor)[0]
+    out_of_range = (features < p_low) | (features > p_high)
+    is_drift    = bool(out_of_range.any())
+    drift_score = float(np.mean(np.abs(features - mean_r) / (std_r + 1e-8)))
 
     return {
-        "is_drift": is_drift,
+        "is_drift":    is_drift,
         "drift_score": round(drift_score, 4),
-        "features": features[0].tolist(),
+        "features":    features.tolist(),
     }

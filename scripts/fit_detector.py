@@ -1,65 +1,64 @@
 """
-fit_detector.py - One-shot script to fit the KSDrift detector on the training set.
+Fitta il detector di drift sulle immagini del training set e salva il risultato.
 
-Run from project root:
-    conda run -n <env> python scripts/fit_detector.py
+Uso:
+    python scripts/fit_detector.py
 
-Reads preprocessed training images from data/processed/train/,
-extracts (mean_R, mean_G, mean_B) features, fits a KSDrift detector,
-and saves it to detector.pkl at the project root.
+Legge i dati preprocessati da data/processed/train/images/
+ed estrae le feature (mean R, G, B) da ogni immagine.
+Salva il detector in detector.json nella root del progetto.
 """
 
 import sys
 from pathlib import Path
 
-# Allow importing from src/
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
 import numpy as np
-import torch
-from torchvision import transforms
 from PIL import Image
-from monitor import fit_detector, DETECTOR_PATH
 
-TRAIN_IMG_DIR = Path("data/processed/train/images")
-IMG_SIZE = 256
+# Permette di importare src/ dalla root del progetto
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from src.monitor import extract_features, fit_detector
+import torch
+
+TRAIN_DIR     = Path("data/processed/train/images")
+DETECTOR_PATH = Path("detector.json")
 
 
-def load_image_as_tensor(path: Path) -> torch.Tensor:
-    transform = transforms.Compose([
-        transforms.Resize((IMG_SIZE, IMG_SIZE)),
-        transforms.ToTensor(),  # -> (C, H, W) in [0, 1]
-    ])
-    img = Image.open(path).convert("RGB")
-    return transform(img)
+def load_image_tensor(img_path: Path):
+    """Carica un'immagine e la converte in tensore CHW float [0,1]."""
+    img = Image.open(img_path).convert("RGB")
+    arr = np.array(img).astype(np.float32) / 255.0   # (H, W, 3)
+    tensor = torch.from_numpy(arr.transpose(2, 0, 1))  # (3, H, W)
+    return tensor
 
 
 def main():
-    if not TRAIN_IMG_DIR.exists():
-        print(f"ERROR: Training image directory not found: {TRAIN_IMG_DIR}")
-        print("Make sure you have run src/preprocess.py first.")
+    images = sorted(TRAIN_DIR.glob("*.png"))
+    if not images:
+        images = sorted(TRAIN_DIR.glob("*.jpg"))
+
+    if not images:
+        print(f"Nessuna immagine trovata in {TRAIN_DIR}")
         sys.exit(1)
 
-    image_paths = sorted(TRAIN_IMG_DIR.glob("*.png"))
-    if not image_paths:
-        print(f"ERROR: No .png images found in {TRAIN_IMG_DIR}")
-        sys.exit(1)
+    print(f"Estrazione feature da {len(images)} immagini di training...")
 
-    print(f"Found {len(image_paths)} training images. Extracting features...")
+    all_features = []
+    for i, img_path in enumerate(images):
+        tensor   = load_image_tensor(img_path)
+        features = extract_features(tensor)   # (1, 3)
+        all_features.append(features[0])
 
-    features = []
-    for path in image_paths:
-        tensor = load_image_as_tensor(path)
-        arr = tensor.numpy()  # (C, H, W)
-        features.append([arr[0].mean(), arr[1].mean(), arr[2].mean()])
+        if (i + 1) % 200 == 0:
+            print(f"  {i + 1}/{len(images)}")
 
-    reference_features = np.array(features, dtype=np.float32)
-    print(f"Feature matrix shape: {reference_features.shape}")
-    print(f"Mean features (R, G, B): {reference_features.mean(axis=0).round(4)}")
+    reference = np.stack(all_features, axis=0)   # (N, 3)
+    print(f"Mean features (R, G, B): {reference.mean(axis=0).round(4)}")
 
-    print(f"Fitting KSDrift detector...")
-    fit_detector(reference_features, save_path=DETECTOR_PATH)
-    print(f"Detector saved to: {DETECTOR_PATH}")
+    print("Fitting KSDrift detector...")
+    fit_detector(reference, save_path=DETECTOR_PATH)
+    print(f"Detector salvato in: {DETECTOR_PATH.resolve()}")
 
 
 if __name__ == "__main__":
