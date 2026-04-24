@@ -18,7 +18,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-DETECTOR_PATH   = Path(__file__).parent.parent / "detector.json"
+DETECTOR_PATH   = Path(__file__).parent.parent / "experiments" / "detector.json"
 P_VAL_THRESHOLD = 0.05   # valori fuori dal 2.5%-97.5% percentile = drift
 
 

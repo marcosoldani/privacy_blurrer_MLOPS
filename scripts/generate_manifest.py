@@ -1,12 +1,12 @@
 """
 generate_manifest.py
 
-Legge i file reali da data/raw/ e genera dataset_v1.0.json con i nomi corretti.
+Legge i file reali da data/raw/ e genera data/manifests/dataset_v1.0.json con i nomi corretti.
 Split 80% train / 20% val.
 
-Uso:
-    python generate_manifest.py
-    python generate_manifest.py --data_dir data/raw --output dataset_v1.0.json --val_ratio 0.2
+Uso (dalla root del progetto):
+    python scripts/generate_manifest.py
+    python scripts/generate_manifest.py --data_dir data/raw --output data/manifests/dataset_v1.0.json --val_ratio 0.2
 """
 
 import argparse
@@ -50,6 +50,7 @@ def generate(data_dir: str, output: str, val_ratio: float):
         }
     }
 
+    Path(output).parent.mkdir(parents=True, exist_ok=True)
     with open(output, "w") as f:
         json.dump(manifest, f, indent=2)
 
@@ -62,7 +63,7 @@ def generate(data_dir: str, output: str, val_ratio: float):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Genera dataset_v1.0.json dai file reali")
     parser.add_argument("--data_dir",  type=str,   default="data/raw",          help="Cartella con images/ e masks/")
-    parser.add_argument("--output",    type=str,   default="dataset_v1.0.json", help="Path output JSON")
+    parser.add_argument("--output",    type=str,   default="data/manifests/dataset_v1.0.json", help="Path output JSON")
     parser.add_argument("--val_ratio", type=float, default=0.2,                 help="Proporzione validation set")
     args = parser.parse_args()
     generate(args.data_dir, args.output, args.val_ratio)

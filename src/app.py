@@ -21,6 +21,7 @@ import io
 import json
 import logging
 import time
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -29,6 +30,7 @@ import numpy as np
 import torch
 import segmentation_models_pytorch as smp
 from fastapi import FastAPI, File, Query, UploadFile, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from PIL import Image, UnidentifiedImageError
 from torchvision import transforms
@@ -64,21 +66,19 @@ MODEL_PATH = Path(__file__).parent.parent / "experiments" / "best.pt"
 IMG_SIZE   = 256
 DEVICE     = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-app = FastAPI(title="Privacy Blurrer", version="1.0.0")
-
 model    = None
 detector = None
 
 
-@app.on_event("startup")
-def load_model():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     global model, detector
 
     if not MODEL_PATH.exists():
         logger.warning(f"Pesi non trovati in {MODEL_PATH}. /predict e /blur non funzioneranno.")
     else:
         m = smp.Unet(encoder_name="resnet34", encoder_weights=None, in_channels=3, classes=1)
-        m.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
+        m.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE, weights_only=True))
         m.to(DEVICE)
         m.eval()
         model = m
@@ -90,6 +90,20 @@ def load_model():
     except FileNotFoundError as e:
         logger.warning(f"Drift detector non disponibile: {e}")
         detector = None
+
+    yield
+
+
+app = FastAPI(title="Privacy Blurrer", version="1.0.0", lifespan=lifespan)
+
+# CORS: consente chiamate dal frontend in sviluppo (qualsiasi porta localhost)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"^http://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # ── Transform ──────────────────────────────────────────────────────────────────
@@ -113,7 +127,7 @@ def validate_image(contents: bytes, filename: str) -> Image.Image:
         image = Image.open(io.BytesIO(contents))
         image.verify()
         image = Image.open(io.BytesIO(contents))
-    except (UnidentifiedImageError, Exception):
+    except Exception:
         raise HTTPException(
             status_code=400,
             detail=f"File non valido o corrotto: '{filename}'."
