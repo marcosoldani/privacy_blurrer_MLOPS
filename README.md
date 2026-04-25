@@ -142,7 +142,7 @@ privacy_blurrer_MLOPS/
 │   ├── preprocess.py       # resize + split train/val/test
 │   ├── train.py            # training loop con MLflow
 │   ├── predict.py          # CLI inference one-shot
-│   └── monitor.py          # drift detection (numpy, percentile-based)
+│   └── monitor.py          # drift detection (alibi-detect KSDrift)
 ├── scripts/                # utility one-shot
 │   ├── fit_detector.py     # fit drift detector sul training
 │   └── generate_manifest.py# genera manifest versionato
@@ -155,7 +155,7 @@ privacy_blurrer_MLOPS/
 │   └── manifests/          # dataset_v1.0.json
 ├── experiments/
 │   ├── best.pt             # checkpoint modello
-│   ├── detector.json       # drift detector fittato
+│   ├── detector.pkl        # drift detector fittato (alibi-detect KSDrift)
 │   ├── mlflow.db           # MLflow tracking DB (in .gitignore)
 │   └── mlruns/             # MLflow run artifacts (in .gitignore)
 ├── logs/

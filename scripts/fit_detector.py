@@ -6,7 +6,7 @@ Uso:
 
 Legge i dati preprocessati da data/processed/train/images/
 ed estrae le feature (mean R, G, B) da ogni immagine.
-Salva il detector in experiments/detector.json.
+Salva il detector in experiments/detector.pkl (KSDrift serializzato).
 """
 
 import sys
@@ -22,7 +22,7 @@ from src.monitor import extract_features, fit_detector
 import torch
 
 TRAIN_DIR     = Path("data/processed/train/images")
-DETECTOR_PATH = Path("experiments/detector.json")
+DETECTOR_PATH = Path("experiments/detector.pkl")
 
 
 def load_image_tensor(img_path: Path):
