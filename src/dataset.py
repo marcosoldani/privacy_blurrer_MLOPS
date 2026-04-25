@@ -2,7 +2,7 @@
 Carica coppie immagine/maschera dal dataset Supervisely.
 
 Struttura attesa:
-    <root>/images/*.jpg
+    <root>/images/*.{jpg,png}
     <root>/masks/*.png   (255 = persona, 0 = sfondo)
 """
 import numpy as np
@@ -17,7 +17,9 @@ class PersonSegmentationDataset(Dataset):
         self.image_dir = Path(root) / "images"
         self.mask_dir  = Path(root) / "masks"
         self.transform = transform
-        self.images    = sorted(self.image_dir.glob("*.jpg"))
+        self.images    = sorted(
+            list(self.image_dir.glob("*.jpg")) + list(self.image_dir.glob("*.png"))
+        )
 
     def __len__(self):
         return len(self.images)

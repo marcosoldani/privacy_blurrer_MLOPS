@@ -54,7 +54,7 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model  = smp.Unet("resnet34", encoder_weights=None, classes=1).to(device)
-    model.load_state_dict(torch.load(args.model, map_location=device))
+    model.load_state_dict(torch.load(args.model, map_location=device, weights_only=True))
 
     mask = predict_mask(model, args.image, device=device)
     Image.fromarray(mask * 255).save(args.output)
