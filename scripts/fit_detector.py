@@ -18,17 +18,17 @@ from PIL import Image
 # Permette di importare src/ dalla root del progetto
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.monitor import extract_features, fit_detector
-import torch
+import torch  # noqa: E402
+from src.monitor import extract_features, fit_detector  # noqa: E402
 
-TRAIN_DIR     = Path("data/processed/train/images")
+TRAIN_DIR = Path("data/processed/train/images")
 DETECTOR_PATH = Path("experiments/detector.pkl")
 
 
 def load_image_tensor(img_path: Path):
     """Carica un'immagine e la converte in tensore CHW float [0,1]."""
     img = Image.open(img_path).convert("RGB")
-    arr = np.array(img).astype(np.float32) / 255.0   # (H, W, 3)
+    arr = np.array(img).astype(np.float32) / 255.0  # (H, W, 3)
     tensor = torch.from_numpy(arr.transpose(2, 0, 1))  # (3, H, W)
     return tensor
 
@@ -46,14 +46,14 @@ def main():
 
     all_features = []
     for i, img_path in enumerate(images):
-        tensor   = load_image_tensor(img_path)
-        features = extract_features(tensor)   # (1, 3)
+        tensor = load_image_tensor(img_path)
+        features = extract_features(tensor)  # (1, 3)
         all_features.append(features[0])
 
         if (i + 1) % 200 == 0:
             print(f"  {i + 1}/{len(images)}")
 
-    reference = np.stack(all_features, axis=0)   # (N, 3)
+    reference = np.stack(all_features, axis=0)  # (N, 3)
     print(f"Mean features (R, G, B): {reference.mean(axis=0).round(4)}")
 
     print("Fitting KSDrift detector...")

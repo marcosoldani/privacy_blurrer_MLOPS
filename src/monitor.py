@@ -22,13 +22,13 @@ from alibi_detect.cd import KSDrift
 
 logger = logging.getLogger(__name__)
 
-DETECTOR_PATH   = Path(__file__).parent.parent / "experiments" / "detector.pkl"
+DETECTOR_PATH = Path(__file__).parent.parent / "experiments" / "detector.pkl"
 P_VAL_THRESHOLD = 0.05
 
 
 def extract_features(image_tensor) -> np.ndarray:
     """Media normalizzata dei canali R, G, B. Shape: (1, 3) float32."""
-    arr      = image_tensor.cpu().numpy()
+    arr = image_tensor.cpu().numpy()
     features = np.array([[arr[0].mean(), arr[1].mean(), arr[2].mean()]], dtype=np.float32)
     return features
 
@@ -57,8 +57,7 @@ def load_detector(path: Path = DETECTOR_PATH) -> KSDrift:
     path = Path(path)
     if not path.exists():
         raise FileNotFoundError(
-            f"Detector non trovato in {path}. "
-            "Esegui prima: python scripts/fit_detector.py"
+            f"Detector non trovato in {path}. " "Esegui prima: python scripts/fit_detector.py"
         )
     with open(path, "rb") as f:
         detector = pickle.load(f)
@@ -81,10 +80,10 @@ def check_drift(image_tensor, detector: KSDrift = None) -> dict:
         detector = load_detector()
 
     features = extract_features(image_tensor)
-    result   = detector.predict(features)["data"]
+    result = detector.predict(features)["data"]
 
     return {
-        "is_drift":    bool(result["is_drift"]),
+        "is_drift": bool(result["is_drift"]),
         "drift_score": round(float(np.mean(result["distance"])), 4),
-        "features":    features[0].tolist(),
+        "features": features[0].tolist(),
     }
