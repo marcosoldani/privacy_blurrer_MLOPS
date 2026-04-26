@@ -1,0 +1,18 @@
+services:
+  backend:
+    build: .
+    image: privacy-blurrer-backend
+    container_name: privacy-blurrer-backend
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    image: privacy-blurrer-frontend
+    container_name: privacy-blurrer-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
