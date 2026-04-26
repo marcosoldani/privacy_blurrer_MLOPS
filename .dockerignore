@@ -1,0 +1,53 @@
+# Riduce il build context da ~3.4 GB a ~100 MB
+# (best.pt 93 MB + detector.pkl 26 KB + src 100 KB + requirements 1 KB)
+
+# Repo / dev
+.git/
+.github/
+.claude/
+.gitignore
+.dockerignore
+README.md
+environment.yml
+LICENSE*
+*.md
+
+# Dataset (3 GB) — non serve nell'image
+data/
+
+# Logs runtime
+logs/
+
+# Documentazione
+docs/
+
+# Frontend (servito separatamente)
+frontend/
+ui/
+
+# Test e scripts (non servono runtime)
+tests/
+scripts/
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Inside experiments/, escludi artefatti derivati / DB locali
+experiments/mlruns/
+experiments/best.onnx
+experiments/best.onnx.data
+experiments/best_int8.pt
+experiments/best_fp16.pt
+experiments/mlflow.db
+experiments/mlflow.db.legacy_backup
+experiments/.DS_Store

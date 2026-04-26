@@ -39,3 +39,30 @@ export async function runAction(file: File, action: ActionType): Promise<Blob> {
 
   return res.blob()
 }
+
+export type Rating = 'good' | 'bad'
+
+export type FeedbackStats = {
+  total: number
+  positive: number
+  percentage: number | null
+}
+
+export async function submitFeedback(
+  filename: string,
+  action: ActionType,
+  rating: Rating,
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/feedback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename, action, rating }),
+  })
+  if (!res.ok) throw new Error(`Feedback submit failed: ${res.status}`)
+}
+
+export async function fetchFeedbackStats(signal?: AbortSignal): Promise<FeedbackStats> {
+  const res = await fetch(`${API_BASE}/feedback/stats`, { signal })
+  if (!res.ok) throw new Error(`Feedback stats failed: ${res.status}`)
+  return res.json()
+}

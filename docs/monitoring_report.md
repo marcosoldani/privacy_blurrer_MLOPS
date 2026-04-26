@@ -1,4 +1,4 @@
-# Monitoring Report — Step 6
+# Monitoring Report
 
 ## Overview
 
