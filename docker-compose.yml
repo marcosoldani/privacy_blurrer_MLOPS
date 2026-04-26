@@ -5,6 +5,10 @@ services:
     container_name: privacy-blurrer-backend
     ports:
       - "8000:8000"
+    volumes:
+      # Persiste predictions.jsonl + feedback.jsonl sul filesystem host.
+      # Senza questo mount, i log si perderebbero ad ogni docker-compose down.
+      - ./logs:/app/logs
     restart: unless-stopped
 
   frontend:

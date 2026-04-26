@@ -6,9 +6,13 @@ Endpoints:
   POST /predict           -> binary segmentation mask (PNG, bianco/nero)
   POST /blur?blur_type=X  -> immagine con persone anonimizzate (PNG)
                              blur_type: gaussian | pixelate | blackout
+  POST /feedback          -> raccoglie giudizio utente (good|bad) sull'output
+  GET  /feedback/stats    -> aggregato {total, positive, percentage}
 
 Funzionalita':
   - Structured JSON logging in logs/predictions.jsonl
+  - User feedback loop in logs/feedback.jsonl (drift indicator + hard
+    example mining per re-labeling futuro)
   - Drift detection via alibi-detect KSDrift (monitor.py)
   - Input validation: formato, dimensioni, dimensione file
   - Guardrails con codici HTTP espliciti (400, 413, 503)
@@ -30,6 +34,7 @@ from fastapi import FastAPI, File, Query, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from PIL import Image
+from pydantic import BaseModel, Field
 from torchvision import transforms
 
 from src.monitor import check_drift, load_detector
@@ -48,6 +53,7 @@ BLUR_TYPES = {"gaussian", "pixelate", "blackout"}
 LOG_DIR = Path(__file__).parent.parent / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 LOG_FILE = LOG_DIR / "predictions.jsonl"
+FEEDBACK_FILE = LOG_DIR / "feedback.jsonl"
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -55,6 +61,11 @@ logger = logging.getLogger(__name__)
 
 def log_prediction(record: dict):
     with open(LOG_FILE, "a") as f:
+        f.write(json.dumps(record) + "\n")
+
+
+def log_feedback(record: dict):
+    with open(FEEDBACK_FILE, "a") as f:
         f.write(json.dumps(record) + "\n")
 
 
@@ -384,3 +395,51 @@ def _log_drift(filename, endpoint, drift_result, mask_coverage, inference_ms):
             f"OK | endpoint={endpoint} | file={filename} | "
             f"coverage={mask_coverage} | inference={inference_ms}ms"
         )
+
+
+# ── Feedback loop ──────────────────────────────────────────────────────────────
+class FeedbackIn(BaseModel):
+    filename: str = Field(..., max_length=256)
+    action: str = Field(..., pattern="^(predict|gaussian|pixelate|blackout)$")
+    rating: str = Field(..., pattern="^(good|bad)$")
+
+
+@app.post("/feedback")
+def feedback(payload: FeedbackIn):
+    """Raccoglie il giudizio dell'utente sull'output di una richiesta."""
+    record = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "filename": payload.filename,
+        "action": payload.action,
+        "rating": payload.rating,
+    }
+    log_feedback(record)
+    logger.info(
+        f"FEEDBACK | file={payload.filename} action={payload.action} rating={payload.rating}"
+    )
+    return {"ok": True}
+
+
+@app.get("/feedback/stats")
+def feedback_stats():
+    """Aggregato dei feedback ricevuti finora."""
+    if not FEEDBACK_FILE.exists():
+        return {"total": 0, "positive": 0, "percentage": None}
+
+    total = 0
+    positive = 0
+    with open(FEEDBACK_FILE, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            total += 1
+            if rec.get("rating") == "good":
+                positive += 1
+
+    percentage = round(100 * positive / total, 1) if total > 0 else None
+    return {"total": total, "positive": positive, "percentage": percentage}

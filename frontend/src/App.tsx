@@ -4,8 +4,16 @@ import { Dropzone } from './components/Dropzone'
 import { ActionBar } from './components/ActionBar'
 import { ImagePanel } from './components/ImagePanel'
 import { HealthBadge } from './components/HealthBadge'
-import { fetchHealth, runAction, API_BASE } from './api'
-import type { ActionType, HealthStatus } from './api'
+import { SatisfactionBadge } from './components/SatisfactionBadge'
+import { FeedbackBar } from './components/FeedbackBar'
+import {
+  fetchHealth,
+  fetchFeedbackStats,
+  runAction,
+  submitFeedback,
+  API_BASE,
+} from './api'
+import type { ActionType, FeedbackStats, HealthStatus, Rating } from './api'
 
 const ACTION_LABELS: Record<ActionType, string> = {
   predict: 'Maschera binaria',
@@ -23,7 +31,14 @@ export function App() {
   const [error, setError] = useState<string | null>(null)
   const [health, setHealth] = useState<HealthStatus | null>(null)
 
-  // Poll health ogni 10s
+  // Feedback state
+  const [feedbackArmed, setFeedbackArmed] = useState(false) // true = chiediamolo alla prossima azione completata
+  const [feedbackContext, setFeedbackContext] = useState<
+    { file: string; action: ActionType } | null
+  >(null) // se non null, FeedbackBar visibile
+  const [feedbackStats, setFeedbackStats] = useState<FeedbackStats | null>(null)
+
+  // Poll health + stats ogni 10s
   useEffect(() => {
     let cancelled = false
 
@@ -33,6 +48,12 @@ export function App() {
         if (!cancelled) setHealth(h)
       } catch {
         if (!cancelled) setHealth(null)
+      }
+      try {
+        const s = await fetchFeedbackStats()
+        if (!cancelled) setFeedbackStats(s)
+      } catch {
+        if (!cancelled) setFeedbackStats(null)
       }
     }
 
@@ -52,6 +73,9 @@ export function App() {
     setResultUrl(null)
     setResultLabel(null)
     setError(null)
+    // Nuova foto: armiamo il feedback per la prossima azione
+    setFeedbackArmed(true)
+    setFeedbackContext(null)
   }
 
   const clearAll = () => {
@@ -62,6 +86,8 @@ export function App() {
     setResultUrl(null)
     setResultLabel(null)
     setError(null)
+    setFeedbackArmed(false)
+    setFeedbackContext(null)
   }
 
   const handleAction = async (action: ActionType) => {
@@ -73,10 +99,27 @@ export function App() {
       if (resultUrl) URL.revokeObjectURL(resultUrl)
       setResultUrl(URL.createObjectURL(blob))
       setResultLabel(ACTION_LABELS[action])
+      // Se era la prima azione su questa foto, chiediamo feedback
+      if (feedbackArmed) {
+        setFeedbackContext({ file: file.name, action })
+        setFeedbackArmed(false)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Errore sconosciuto')
     } finally {
       setLoading(null)
+    }
+  }
+
+  const handleFeedback = async (rating: Rating) => {
+    if (!feedbackContext) return
+    await submitFeedback(feedbackContext.file, feedbackContext.action, rating)
+    // refresh stats subito (non aspettare il prossimo polling)
+    try {
+      const s = await fetchFeedbackStats()
+      setFeedbackStats(s)
+    } catch {
+      // ignore stats refresh errors
     }
   }
 
@@ -110,7 +153,10 @@ export function App() {
               </p>
             </div>
           </div>
-          <HealthBadge health={health} />
+          <div className="flex items-center gap-2">
+            <SatisfactionBadge stats={feedbackStats} />
+            <HealthBadge health={health} />
+          </div>
         </div>
       </header>
 
@@ -161,6 +207,14 @@ export function App() {
               modelReady={modelReady}
               disabled={backendDown}
             />
+
+            {feedbackContext && resultUrl && (
+              <FeedbackBar
+                filename={feedbackContext.file}
+                action={feedbackContext.action}
+                onSubmit={handleFeedback}
+              />
+            )}
           </>
         )}
       </main>
