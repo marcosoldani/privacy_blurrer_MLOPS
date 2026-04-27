@@ -140,6 +140,8 @@ Endpoints:
 - `GET /health` — liveness + stato modello
 - `POST /predict` — maschera binaria PNG (multipart: `file`)
 - `POST /blur?blur_type={gaussian|pixelate|blackout}` — immagine anonimizzata PNG
+- `POST /feedback` — invio giudizio utente (rating + action) → append su `logs/feedback.jsonl`
+- `GET /feedback/stats` — aggregato dei feedback ricevuti
 
 Validazione input:
 - formati: JPEG, PNG, BMP, WEBP
@@ -183,12 +185,15 @@ privacy_blurrer_MLOPS/
 │   ├── export_onnx.py      # esporta best.pt → best.onnx
 │   ├── quantize_model.py   # INT8 / FP16 quantization + size/latency report
 │   └── register_model.py   # registra best.pt nel MLflow Model Registry
-├── tests/                  # test PyTest (23 test, ~75% coverage)
+├── tests/                  # test PyTest (37 test, ~75% coverage)
 │   ├── test_dataset.py     # unit test sul Dataset
 │   ├── test_pipeline.py    # infrastructure tests (incl. overfit single batch)
 │   ├── test_evaluation.py  # evaluation test con threshold IoU
 │   ├── test_behavioral.py  # behavioral (flip) + perturbation (noise)
-│   └── test_api.py         # API tests via FastAPI TestClient
+│   ├── test_api.py         # API tests via FastAPI TestClient
+│   ├── test_feedback.py    # endpoint /feedback + /feedback/stats
+│   ├── test_monitor.py     # drift detector: features, fit/load, default
+│   └── test_predict_cli.py # CLI src/predict.py: happy path + arg mancanti
 ├── data/
 │   ├── raw/                # dataset grezzo (in .gitignore)
 │   ├── processed/          # output di preprocess.py (in .gitignore)
@@ -222,13 +227,20 @@ privacy_blurrer_MLOPS/
 pytest tests/ -v
 ```
 
-23 test, **coverage ~75%** (`src/app.py` 89%, `src/dataset.py` 89%,
+37 test, **coverage ~75%** (`src/app.py` 89%, `src/dataset.py` 89%,
 `src/preprocess.py` 97%):
 - **dataset** (5) — unit test su `PersonSegmentationDataset`
 - **pipeline** (8) — infrastructure tests, incluso overfit-single-batch
 - **evaluation** (1) — regression guard con threshold IoU su val set
 - **behavioral** (2) — flip invariance + gaussian noise robustness
-- **api** (7) — FastAPI TestClient: `/health`, validation 400/413, happy paths
+- **api** (10) — FastAPI TestClient: `/health`, validation 400/413, happy
+  paths, log su rejection, 503 quando model assente
+- **feedback** (5) — endpoint `/feedback` (rating/action validation) +
+  `/feedback/stats` (aggregato vuoto e popolato)
+- **monitor** (4) — drift detector: feature extraction, fit+save, load
+  errors, fallback su detector di default
+- **predict_cli** (2) — `src/predict.py` CLI: happy path su checkpoint
+  fittizio + errore se manca `--model`
 
 Coverage dettagliata:
 
