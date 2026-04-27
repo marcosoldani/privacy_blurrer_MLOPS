@@ -203,8 +203,7 @@ privacy_blurrer_MLOPS/
 ├── frontend/               # React + Vite + Tailwind
 ├── docs/
 │   ├── monitoring_report.md         # report drift detection
-│   ├── bias_variance_analysis.md    # analisi metriche e prossimi passi
-│   └── foundation_model_decision.md # giustificazione scelta no-FM
+│   └── bias_variance_analysis.md    # analisi metriche e prossimi passi
 ├── .github/workflows/
 │   └── ci.yml              # Black + Flake8 + PyTest su push/PR (main, dev)
 ├── .pre-commit-config.yaml # hook locali Black + Flake8 + checks
