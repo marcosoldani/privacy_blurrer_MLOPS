@@ -108,3 +108,51 @@ def test_blur_gaussian_returns_image(client):
     assert r.status_code == 200
     assert r.headers["content-type"].startswith("image/")
     assert len(r.content) > 0
+
+def test_predict_logs_rejection_on_invalid_payload(client, tmp_path, monkeypatch):
+    """Quando /predict rifiuta input, il log strutturato cattura il rejection_reason."""
+    fake_log = tmp_path / "predictions.jsonl"
+    monkeypatch.setattr("src.app.LOG_FILE", fake_log)
+
+    files = {"file": ("data.txt", b"not an image", "text/plain")}
+    r = client.post("/predict", files=files)
+    assert r.status_code == 400
+
+    assert fake_log.exists()
+    import json
+    with open(fake_log) as f:
+        rec = json.loads(f.readlines()[-1])
+    assert rec["validation_passed"] is False
+    assert "rejection_reason" in rec
+
+
+def test_blur_logs_rejection_on_invalid_payload(client, tmp_path, monkeypatch):
+    """Stesso comportamento per /blur."""
+    fake_log = tmp_path / "predictions.jsonl"
+    monkeypatch.setattr("src.app.LOG_FILE", fake_log)
+
+    files = {"file": ("data.txt", b"not an image", "text/plain")}
+    r = client.post("/blur?blur_type=gaussian", files=files)
+    assert r.status_code == 400
+
+    assert fake_log.exists()
+    import json
+    with open(fake_log) as f:
+        rec = json.loads(f.readlines()[-1])
+    assert rec["validation_passed"] is False
+
+
+def test_predict_returns_503_when_model_missing(client, monkeypatch):
+    """Senza modello caricato, /predict ritorna 503."""
+    import io
+    from PIL import Image
+
+    monkeypatch.setattr("src.app.model", None)
+
+    img = Image.new("RGB", (64, 64))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    files = {"file": ("x.png", buf.getvalue(), "image/png")}
+
+    r = client.post("/predict", files=files)
+    assert r.status_code == 503
