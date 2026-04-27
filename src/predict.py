@@ -4,15 +4,15 @@ Inference su una singola immagine: produce e salva la maschera binaria.
 Uso:
     python src/predict.py --model experiments/best.pt --image path/to/image.jpg
 """
+
 import argparse
 import numpy as np
 import torch
-from pathlib import Path
 from PIL import Image
 
 import segmentation_models_pytorch as smp
 
-IMG_SIZE  = (256, 256)
+IMG_SIZE = (256, 256)
 THRESHOLD = 0.5
 
 
@@ -34,13 +34,13 @@ def predict_mask(model, img_path, img_size=IMG_SIZE, threshold=THRESHOLD, device
         device = torch.device("cpu")
 
     img = Image.open(img_path).convert("RGB").resize(img_size)
-    x   = torch.from_numpy(np.array(img).transpose(2, 0, 1)).float() / 255.0
-    x   = x.unsqueeze(0).to(device)
+    x = torch.from_numpy(np.array(img).transpose(2, 0, 1)).float() / 255.0
+    x = x.unsqueeze(0).to(device)
 
     model.eval()
     with torch.no_grad():
         logits = model(x)
-        mask   = (torch.sigmoid(logits) > threshold).squeeze().cpu().numpy().astype(np.uint8)
+        mask = (torch.sigmoid(logits) > threshold).squeeze().cpu().numpy().astype(np.uint8)
 
     return mask
 
@@ -53,8 +53,8 @@ def main():
     args = parser.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model  = smp.Unet("resnet34", encoder_weights=None, classes=1).to(device)
-    model.load_state_dict(torch.load(args.model, map_location=device))
+    model = smp.Unet("resnet34", encoder_weights=None, classes=1).to(device)
+    model.load_state_dict(torch.load(args.model, map_location=device, weights_only=True))
 
     mask = predict_mask(model, args.image, device=device)
     Image.fromarray(mask * 255).save(args.output)
