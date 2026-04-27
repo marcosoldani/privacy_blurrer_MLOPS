@@ -60,6 +60,7 @@ def test_load_detector_raises_on_missing_file(tmp_path):
     with pytest.raises(FileNotFoundError, match="Detector non trovato"):
         load_detector(path=missing_path)
 
+
 def test_check_drift_loads_default_detector(tmp_path, monkeypatch):
     """check_drift senza detector esplicito → carica quello in DETECTOR_PATH."""
     rng = np.random.default_rng(seed=0)

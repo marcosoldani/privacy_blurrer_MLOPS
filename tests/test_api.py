@@ -109,6 +109,7 @@ def test_blur_gaussian_returns_image(client):
     assert r.headers["content-type"].startswith("image/")
     assert len(r.content) > 0
 
+
 def test_predict_logs_rejection_on_invalid_payload(client, tmp_path, monkeypatch):
     """Quando /predict rifiuta input, il log strutturato cattura il rejection_reason."""
     fake_log = tmp_path / "predictions.jsonl"
@@ -120,6 +121,7 @@ def test_predict_logs_rejection_on_invalid_payload(client, tmp_path, monkeypatch
 
     assert fake_log.exists()
     import json
+
     with open(fake_log) as f:
         rec = json.loads(f.readlines()[-1])
     assert rec["validation_passed"] is False
@@ -137,6 +139,7 @@ def test_blur_logs_rejection_on_invalid_payload(client, tmp_path, monkeypatch):
 
     assert fake_log.exists()
     import json
+
     with open(fake_log) as f:
         rec = json.loads(f.readlines()[-1])
     assert rec["validation_passed"] is False
